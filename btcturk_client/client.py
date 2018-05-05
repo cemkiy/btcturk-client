@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import urlparse
-import requests
-import urllib
+import urllib.parse
+import urllib3
 import time
 import hashlib
 import hmac
 import base64
 
-from tools import authenticated_method
+import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+from .tools import authenticated_method
 
 
 class Btcturk(object):
@@ -26,9 +29,9 @@ class Btcturk(object):
                 raise TypeError("query_string variable should be a dictionary.")
 
         if query_string:
-            action = "{}/?{}".format(action, urllib.urlencode(query_string))
+            action = "{}/?{}".format(action, urllib.parse.urlencode(query_string))
 
-        abs_url = urlparse.urljoin(self.API_BASE_URL, action)
+        abs_url = urllib.parse.urljoin(self.API_BASE_URL, action)
 
         return abs_url
 
@@ -56,38 +59,42 @@ class Btcturk(object):
         private_key = base64.b64decode(self.private_key)
 
         # get the signature
-        signature = hmac.new(private_key, data, hashlib.sha256).digest()
+        signature = hmac.new(private_key, data.encode('utf-8'), hashlib.sha256).digest()
         headers["X-Signature"] = base64.b64encode(signature)
 
         return headers
 
     def ticker(self):
-        response = requests.get(self._generate_url("ticker"), verify=False)
+        response = requests.get(self._generate_url("ticker"),
+            verify=False
+        )
 
         return response.json()
 
-    def trades(self, since_id=None):
-        if since_id:
-            response = requests.get(self._generate_url("trades", {"sinceid": since_id}), verify=False)
-        else:
-            response = requests.get(self._generate_url("trades"), verify=False)
+    def trades(self, pairSymbol='BTCTRY', last=50):
+        response = requests.get(self._generate_url("trades", {'pairSymbol': pairSymbol, 'last': last}),
+            verify=False
+        )
 
         return response.json()
 
     def ohcl_data(self, last=None):
-        response = requests.get(self._generate_url("ohlcdata", {"last": last}), verify=False)
+        response = requests.get(self._generate_url("ohlcdata", {"last": last}),
+            verify=False
+        )
 
         return response.json()
 
-    def orderbook(self):
-        response = requests.get(self._generate_url("orderbook"), verify=False)
+    def orderbook(self, pairSymbol='BTCTRY'):
+        response = requests.get(self._generate_url("orderbook", {'pairSymbol': pairSymbol}),
+            verify=False
+        )
 
         return response.json()
 
     @authenticated_method
     def balance(self):
-        response = requests.get(
-            self._generate_url("balance"),
+        response = requests.get(self._generate_url("balance"),
             headers=self._get_auth_headers(),
             verify=False
         )
@@ -108,13 +115,11 @@ class Btcturk(object):
         return response
 
     @authenticated_method
-    def open_orders(self):
-        response = requests.get(
-            self._generate_url("openOrders"),
+    def open_orders(self, pairSymbol='BTCTRY'):
+        response = requests.get(self._generate_url("openOrders", {'pairSymbol': pairSymbol}),
             headers=self._get_auth_headers(),
             verify=False,
         )
-
         return response
 
     @authenticated_method
